@@ -9,7 +9,7 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 # Todo
 
 - [] Provide all input sources
-- [] Clean and refactor code
+- [] Clear and refactor code
 
 ## Available Scripts
 
