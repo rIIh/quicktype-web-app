@@ -39,13 +39,30 @@ enum InputSource {
 function App() {
   const appBar = useRef();
   const [showOptions, setShowOptions] = useState(true);
-  const [name, setName] = useState('ClassName');
+  const [name, setName] = useState('Welcome');
   const [inputType, setInputType] = useState('json');
 
   const [language, setLanguage] = useState<TargetLanguage>();
   const [options, setOptions] = useState<Immutable.Map<OptionDefinition, any>>();
 
-  const [json, setJson] = useState('');
+  const [json, setJson] = useState(`
+  {
+  "name": "How To Live Forever",
+  "artist": {
+    "name": "Michael Forrest",
+    "founded": 1982,
+    "members": [
+      "Michael Forrest"
+    ]
+  },
+  "tracks": [
+    {
+      "name": "Get Connected",
+      "duration": 208
+    }
+  ]
+}
+`);
   const converted = useAsyncMemo(async () => {
     if (!language) {
       return null;
@@ -93,7 +110,7 @@ function App() {
           <IconButton color="inherit" target="_blank" href="https://github.com/quicktype/quicktype/blob/master/FAQ.md">
             <InfoOutlined/>
           </IconButton>
-          <IconButton color="inherit" target="_blank" href="https://github.com/quicktype/quicktype/blob/master/FAQ.md">
+          <IconButton color="inherit" target="_blank" href="https://github.com/rIIh/quicktype-web-app">
             <GitHub/>
           </IconButton>
         </Toolbar>
@@ -119,7 +136,8 @@ function App() {
         </Popper>
         <Grid container style={{flexGrow: 1}}>
           <Grid item xs={3} style={{overflow: "hidden", display: 'flex', flexDirection: 'column'}}>
-            <Box p={1} color="white" bgcolor="#08212a" height="100%" style={{display: "flex", flexDirection: "column", flexGrow: 1, maxHeight: '100%'}}>
+            <Box p={1} color="white" bgcolor="#08212a" height="100%"
+                 style={{display: "flex", flexDirection: "column", flexGrow: 1, maxHeight: '100%'}}>
               <ThemeProvider theme={createMuiTheme({
                 palette: {
                   type: "dark",
@@ -134,7 +152,8 @@ function App() {
                     <Select style={{width: '100%'}} value={inputType}
                             onChange={event => setInputType(event.target.value as InputSource)}>
                       {Object.entries(InputSource)
-                        .map(([key, name]) => <MenuItem key={key} disabled={key != 'json'} value={key}>{name}</MenuItem>)}
+                        .map(([key, name]) => <MenuItem key={key} disabled={key != 'json'}
+                                                        value={key}>{name}</MenuItem>)}
                     </Select>
                   </Grid>
                 </Grid>

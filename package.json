@@ -27,7 +27,11 @@
     "use-async-memo": "^1.2.2",
     "web-vitals": "^0.2.4"
   },
+  "resolutions": {
+    "graceful-fs": "^4.2.4"
+  },
   "scripts": {
+    "preinstall": "npx npm-force-resolutions",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

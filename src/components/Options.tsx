@@ -63,11 +63,11 @@ export const Options = ({onChanged}: {
                    onOptionChanged={(option, value) => {
                      setOptions(options.set(option, value));
                    }}/>
-      {
-        Object.entries(inferenceFlags).map(([name, details]) => {
-          return <p key={name}>{name}: {details.description}</p>
-        })
-      }
+      {/*{*/}
+      {/*  Object.entries(inferenceFlags).map(([name, details]) => {*/}
+      {/*    return <p key={name}>{name}: {details.description}</p>*/}
+      {/*  })*/}
+      {/*}*/}
     </Box>,
   ];
 
