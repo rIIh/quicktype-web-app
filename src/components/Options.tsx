@@ -10,7 +10,7 @@ import {
   Switch,
   FormControlLabel, TextField
 } from "@material-ui/core";
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import Immutable from 'immutable';
 import {
   defaultTargetLanguages,
@@ -24,22 +24,33 @@ import humanizeString from "humanize-string";
 
 const languageMap: Map<string, TargetLanguage> = new Map(defaultTargetLanguages.map(value => [value.name, value]));
 
-export const Options = ({onChanged}: {
+export const Options = ({onChanged, initial}: {
   onChanged?: (
     language: TargetLanguage,
     options: Immutable.Map<OptionDefinition, any>
   ) => void,
+  initial: {
+    language: TargetLanguage,
+    options: Immutable.Map<OptionDefinition, any>,
+  }
 }) => {
   const [tab, setTab] = useState(0);
-  const [selectedLanguage, setLanguage] = useState(defaultTargetLanguages[0].name);
-  const language = useMemo(() => languageMap.get(selectedLanguage)!, [selectedLanguage]);
-  const [options, setOptions] = useState<Immutable.Map<OptionDefinition, any>>(Immutable.Map())
+
+  const [langName, setLangName] = useState(initial.language.name);
+  const language = useMemo(() => languageMap.get(langName)!, [langName]);
+
+  const [options, setOptions] = useState<Immutable.Map<OptionDefinition, any>>(initial.options ?? Immutable.Map())
+  let renderCount = useRef(0);
   useEffect(
-    () => setOptions(() => Immutable.Map(language.optionDefinitions.map(option => [option, option.defaultValue]))),
+    () => renderCount.current++ > 0
+      && setOptions(() => Immutable.Map(language.optionDefinitions.map(option => [option, option.defaultValue])))
+      || undefined,
     [language]
   );
 
-  useEffect(() => onChanged?.(language, options), [language, options]);
+  useEffect(() => {
+    onChanged?.(language, options);
+  }, [language, options]);
 
   const panels = [
     <Box>
@@ -47,8 +58,8 @@ export const Options = ({onChanged}: {
         <InputLabel id="language-select-label-id">
           Language
         </InputLabel>
-        <Select labelId="language-select-label-id" id="language-select-id" value={selectedLanguage}
-                onChange={(event) => setLanguage(event.target.value as string)}>
+        <Select labelId="language-select-label-id" id="language-select-id" value={langName}
+                onChange={(event) => setLangName(event.target.value as string)}>
           {defaultTargetLanguages.map(lang => <MenuItem key={lang.name}
                                                         value={lang.name}>{lang.displayName}</MenuItem>)}
         </Select>
@@ -102,7 +113,7 @@ const OptionsList = ({language, type, options, onOptionChanged}: {
       .filter(option => option.kind == type)
       .map(option => {
         if (typeof option.type() == "boolean") {
-          return <FormControlLabel control={<Switch value={options.get(option) ?? option.defaultValue}
+          return <FormControlLabel control={<Switch checked={options.get(option) ?? option.defaultValue}
                                                     onChange={(event, checked) => onOptionChanged(option, checked)}/>}
                                    label={option.description}/>
         } else {
@@ -126,7 +137,7 @@ const OptionsList = ({language, type, options, onOptionChanged}: {
             </FormControl>;
           }
           return <TextField label={option.description}
-                            style={{width:'100%'}}
+                            style={{width: '100%'}}
                             value={options.get(option) ?? option.defaultValue}
                             onChange={event => onOptionChanged(option, event.target.value)}
           />;

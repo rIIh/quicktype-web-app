@@ -1,13 +1,14 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useMemo, useRef, useState} from "react";
 import Immutable from 'immutable';
 import AceEditor from "react-ace";
+import createPersistedState from 'use-persisted-state';
 
 import "ace-builds/src-noconflict/mode-json";
 import "ace-builds/src-noconflict/theme-solarized_dark";
 
 import "./App.css";
 import {
-  quicktype, jsonInputForTargetLanguage, TargetLanguage, OptionDefinition, InputData,
+  quicktype, jsonInputForTargetLanguage, TargetLanguage, OptionDefinition, InputData, defaultTargetLanguages,
 } from "quicktype/dist/quicktype-core";
 import {
   AppBar,
@@ -16,17 +17,13 @@ import {
   Button,
   Icon,
   Box,
-  Popper, Grid, Theme, Divider, Input, Select, MenuItem, ThemeProvider, createMuiTheme, IconButton,
+  Popper, Grid, Input, Select, MenuItem, ThemeProvider, createMuiTheme, IconButton,
 } from "@material-ui/core";
 import {VisibilityRounded, VisibilityOffRounded, InfoOutlined, GitHub} from "@material-ui/icons";
 import {Options} from "./components/Options";
 import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/default-highlight";
 import {useAsyncMemo} from "use-async-memo";
-import {theme} from "./theme";
-
-const styles = (theme: Theme) => ({
-  toolbar: theme.mixins.toolbar,
-});
+import produce from "immer";
 
 enum InputSource {
   json = 'JSON',
@@ -36,17 +33,35 @@ enum InputSource {
   postman = 'Postman v2.1',
 }
 
+
+interface PersistedState {
+  name: string;
+  inputType: string;
+  language: string;
+  options: Record<string, any>;
+  json: string;
+}
+
+interface State {
+  name: string;
+  inputType: string;
+  language: TargetLanguage;
+  options: Immutable.Map<OptionDefinition, any>;
+  json: string;
+}
+
+const useAppState = createPersistedState('app_state', localStorage);
+
 function App() {
   const appBar = useRef();
   const [showOptions, setShowOptions] = useState(true);
-  const [name, setName] = useState('Welcome');
-  const [inputType, setInputType] = useState('json');
-
-  const [language, setLanguage] = useState<TargetLanguage>();
-  const [options, setOptions] = useState<Immutable.Map<OptionDefinition, any>>();
-
-  const [json, setJson] = useState(`
-  {
+  const [persistedState, setState] = useAppState<PersistedState>({
+    language: defaultTargetLanguages[0].name,
+    name: 'Welcome',
+    inputType: 'json',
+    options: Immutable.Map(defaultTargetLanguages[0].optionDefinitions.map(option => [option.name, option.defaultValue])),
+    json: `
+{
   "name": "How To Live Forever",
   "artist": {
     "name": "Michael Forrest",
@@ -61,27 +76,64 @@ function App() {
       "duration": 208
     }
   ]
-}
-`);
+}`
+  });
+
+  const computedState = useMemo<State>(() => {
+    const language = defaultTargetLanguages.find(value => value.name == persistedState.language)!;
+    const options = Immutable.Map(language.optionDefinitions.map(option => [option, persistedState.options[option.name]]));
+    return ({
+      name: persistedState.name,
+      json: persistedState.json,
+      inputType: persistedState.inputType,
+      language: language,
+      options: options,
+    });
+  }, [persistedState]);
+
+  /*  const [name, setName] = useState(loadSave()?.name ?? 'Welcome');
+    const [inputType, setInputType] = useState(loadSave()?.inputType ?? 'json');
+
+    const [language, setLanguage] = useState<TargetLanguage>(loadSave()?.language ?? defaultTargetLanguages[0]);
+    const [options, setOptions] = useState<Immutable.Map<OptionDefinition, any> | undefined>(loadSave()?.options ?? Immutable.Map(
+      language.optionDefinitions.map(option => [option, option.defaultValue])
+    ));*/
+  /*
+    const [json, setJson] = useState(loadSave()?.json ?? `
+    {
+    "name": "How To Live Forever",
+    "artist": {
+      "name": "Michael Forrest",
+      "founded": 1982,
+      "members": [
+        "Michael Forrest"
+      ]
+    },
+    "tracks": [
+      {
+        "name": "Get Connected",
+        "duration": 208
+      }
+    ]
+  }
+  `);*/
+
   const converted = useAsyncMemo(async () => {
-    if (!language) {
-      return null;
-    }
     try {
-      const input = jsonInputForTargetLanguage(language);
+      const input = jsonInputForTargetLanguage(persistedState.language);
       await input.addSource({
-        name: name,
-        samples: [json],
+        name: persistedState.name,
+        samples: [persistedState.json],
       });
 
       const inputData = new InputData();
       inputData.addInput(input);
 
-      const rendererOptions = options?.map((value, key) => ({[key.name]: value}))
+      const rendererOptions = computedState.options.map((value, key) => ({[key.name]: value}))
         .reduce((acc, pair) => ({...acc, ...pair}), {});
 
       return quicktype({
-        lang: language,
+        lang: persistedState.language,
         rendererOptions: rendererOptions,
         inputData: inputData,
       });
@@ -89,9 +141,7 @@ function App() {
       console.warn(e);
       return null;
     }
-  }, [json, language, options, name]);
-
-  useEffect(() => console.log(json), [json]);
+  }, [persistedState]);
 
   return (
     <>
@@ -129,9 +179,11 @@ function App() {
             },
           }}
         >
-          <Options onChanged={(language1, options1) => {
-            setLanguage(language1);
-            setOptions(options1);
+          <Options initial={computedState} onChanged={(language, options) => {
+            setState((state) => produce(state, draft => {
+              draft.language = language.name;
+              draft.options = options.reduce((acc, value, key) => ({...acc, [key.name]: value}), {});
+            }))
           }}/>
         </Popper>
         <Grid container style={{flexGrow: 1}}>
@@ -145,12 +197,16 @@ function App() {
               })}>
                 <Grid container spacing={1} style={{flex: 'auto 0 0'}}>
                   <Grid item xs>
-                    <Input style={{width: '100%'}} color={"primary"} value={name}
-                           onChange={event => setName(event.target.value)}/>
+                    <Input style={{width: '100%'}} color={"primary"} value={persistedState.name}
+                           onChange={event => setState(state => produce(state, draft => {
+                             draft.name = event.target.value;
+                           }))}/>
                   </Grid>
                   <Grid item xs>
-                    <Select style={{width: '100%'}} value={inputType}
-                            onChange={event => setInputType(event.target.value as InputSource)}>
+                    <Select style={{width: '100%'}} value={persistedState.inputType}
+                            onChange={event => setState(state => produce(state, draft => {
+                              draft.inputType = event.target.value as InputSource;
+                            }))}>
                       {Object.entries(InputSource)
                         .map(([key, name]) => <MenuItem key={key} disabled={key != 'json'}
                                                         value={key}>{name}</MenuItem>)}
@@ -160,9 +216,11 @@ function App() {
                 <Box height={10}/>
                 <AceEditor
                   mode="json"
-                  value={json}
+                  value={persistedState.json}
                   theme="solarized_dark"
-                  onChange={setJson}
+                  onChange={value => setState(state => produce(state, draft => {
+                    draft.json = value;
+                  }))}
                   editorProps={{$blockScrolling: true}}
                   style={{width: "100%", flexGrow: 1}}
                 />
@@ -170,7 +228,7 @@ function App() {
             </Box>
           </Grid>
           <Grid item xs style={{overflow: "hidden"}}>
-            <SyntaxHighlighter language={language?.name} customStyle={{height: '100%', margin: 0}}>
+            <SyntaxHighlighter language={computedState.language.name} customStyle={{height: '100%', margin: 0}}>
               {converted?.lines?.join('\n') ?? ''}
             </SyntaxHighlighter>
           </Grid>
